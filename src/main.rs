@@ -1,12 +1,21 @@
+#[derive(Deserialize)]
+struct Event {
+    r#type: String,
+    short: String,
+    donation_total: f64,
+    donation_count: u64,
+    donation_max: f64,
+}
+
 pub fn main() {
     // totals
-    // let url = "https://donate.cherry-rush.org/tracker/api/v2/events/2/?totals";
+    let url = "https://donate.cherry-rush.org/tracker/api/v2/events/2/?totals";
     // incentives
-    let url = "https://donate.cherry-rush.org/tracker/api/v2/bids/";
+    // let url = "https://donate.cherry-rush.org/tracker/api/v2/bids/";
     let result = reqwest::blocking::get(url)
-        .expect("request failed")
-        .text()
-        .expect("body failed");
+        .unwrap()
+        .json::<ImageResponse>()
+        .unwrap();
 
-    println!("{}", result);
+    println!("{} {} {} {} {}", result.type, result.short, result.donation_total, result.donation_count, result.donation_max);
 }
