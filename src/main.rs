@@ -65,6 +65,9 @@ async fn listen(name: &str, url: &str) {
             .parse()
             .unwrap(),
     );
+    request
+        .headers_mut()
+        .insert("Origin", "https://donate.cherry-rush.org".parse().unwrap());
 
     // let request = Request::builder()
     //     .uri(url)
