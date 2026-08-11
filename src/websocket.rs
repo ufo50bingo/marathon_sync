@@ -5,7 +5,10 @@ use tokio_tungstenite::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::donation::DonationMessage;
+use crate::{
+    TOTAL_DONATION_FILENAME, dollars::format_dollars, donation::DonationMessage,
+    write_file::write_file,
+};
 
 pub async fn connect_socket(
     url: &str,
@@ -67,9 +70,14 @@ pub async fn run_connection(
                         match donation {
                           Ok(d) => {
                             println!("Got new donation amount {}", d.amount);
+                            let dollars = format_dollars(d.all_donors_event_total);
+                            match write_file(&dollars, TOTAL_DONATION_FILENAME) {
+                                Ok(_) => println!("Updated {TOTAL_DONATION_FILENAME} to {dollars}"),
+                                Err(_) => println!("Failed to write to file!"),
+                            };
                           },
                           Err(_) => {
-                            println!("Failed to parse donation message");
+                            println!("Failed to parse donation message!");
                           }
                         }
                     }
