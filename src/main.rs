@@ -1,4 +1,5 @@
 mod auth;
+mod bid;
 mod config;
 mod dollars;
 mod donation;
@@ -10,6 +11,7 @@ mod write_file;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    bid::{fetch_bids, write_bid},
     config::{EVENT_ID, TOTAL_DONATION_FILENAME},
     dollars::format_dollars,
     write_file::write_file,
@@ -34,6 +36,22 @@ async fn main() {
         }
         Err(_) => {
             println!("Failed to fetch initial donation total!");
+        }
+    }
+
+    println!("Initializing bids");
+    let bids = fetch_bids(EVENT_ID).await;
+    match bids {
+        Ok(bids) => {
+            for bid in &bids {
+                if let Err(_) = write_bid(bid) {
+                    println!("Failed to write bid {} to file!", &bid.full_name);
+                }
+            }
+            println!("Finished writing bids to file!");
+        }
+        Err(_) => {
+            println!("Failed to fetch initial bids!");
         }
     }
 

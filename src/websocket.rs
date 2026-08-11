@@ -6,7 +6,7 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    TOTAL_DONATION_FILENAME, dollars::format_dollars, donation::DonationMessage,
+    TOTAL_DONATION_FILENAME, bid::write_bid, dollars::format_dollars, donation::DonationMessage,
     write_file::write_file,
 };
 
@@ -75,6 +75,12 @@ pub async fn run_connection(
                                 Ok(_) => println!("Updated {TOTAL_DONATION_FILENAME} to {dollars}"),
                                 Err(_) => println!("Failed to write to file!"),
                             };
+                            for bid in d.bids.iter().filter(|b| b.istarget) {
+                                if let Err(_) = write_bid(bid) {
+                                    println!("Failed to write bid {} to file!", &bid.full_name);
+                                }
+                            }
+                            println!("Finished writing bids to file!");
                           },
                           Err(_) => {
                             println!("Failed to parse donation message!");
