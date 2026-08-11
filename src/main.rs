@@ -1,5 +1,6 @@
 mod auth;
 mod config;
+mod dollars;
 mod donation;
 mod event;
 mod listener;
@@ -10,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     config::{EVENT_ID, TOTAL_DONATION_FILENAME},
+    dollars::format_dollars,
     write_file::write_file,
 };
 use auth::{load_cookie, login, validate_cookie};
@@ -24,14 +26,9 @@ async fn main() {
     let event = fetch_event(EVENT_ID).await;
     match event {
         Ok(e) => {
-            match write_file(
-                &format!("${:.2}", e.donation_total),
-                TOTAL_DONATION_FILENAME,
-            ) {
-                Ok(_) => println!(
-                    "Initialized {TOTAL_DONATION_FILENAME} to ${:.2}",
-                    e.donation_total
-                ),
+            let dollars = format_dollars(e.donation_total);
+            match write_file(&dollars, TOTAL_DONATION_FILENAME) {
+                Ok(_) => println!("Initialized {TOTAL_DONATION_FILENAME} to {dollars}"),
                 Err(_) => println!("Failed to write to file!"),
             }
         }
