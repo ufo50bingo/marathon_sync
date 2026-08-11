@@ -1,3 +1,6 @@
+use reqwest;
+use serde::Deserialize;
+
 #[derive(Deserialize)]
 struct Event {
     r#type: String,
@@ -14,8 +17,8 @@ pub fn main() {
     // let url = "https://donate.cherry-rush.org/tracker/api/v2/bids/";
     let result = reqwest::blocking::get(url)
         .unwrap()
-        .json::<ImageResponse>()
+        .json::<Event>()
         .unwrap();
 
-    println!("{} {} {} {} {}", result.type, result.short, result.donation_total, result.donation_count, result.donation_max);
+    println!("{} {} {} {} {}", result.r#type, result.short, result.donation_total, result.donation_count, result.donation_max);
 }
