@@ -23,10 +23,10 @@ const SOCKETS: &[(&str, &str)] = &[
         "donations",
         "wss://donate.cherry-rush.org/tracker/ws/donations/",
     ),
-    (
-        "processing",
-        "wss://donate.cherry-rush.org/tracker/ws/processing/",
-    ),
+    // (
+    //     "processing",
+    //     "wss://donate.cherry-rush.org/tracker/ws/processing/",
+    // ),
 ];
 
 /// Load the saved sessionid from cookie.txt.
