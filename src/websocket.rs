@@ -6,8 +6,8 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    TOTAL_DONATION_FILENAME, bid::write_bid, dollars::format_dollars, donation::DonationMessage,
-    write_file::write_file,
+    TOTAL_DONATION_FILENAME, bid::write_bid, config::EVENT_ID, dollars::format_dollars,
+    donation::DonationMessage, write_file::write_file,
 };
 
 pub async fn connect_socket(
@@ -68,7 +68,10 @@ pub async fn run_connection(
                         println!("{text}");
                         let donation = serde_json::from_str::<DonationMessage>(&text);
                         match donation {
-                          Ok(d) => {
+                          Ok(d) => 'dono: {
+                            if d.event != EVENT_ID {
+                                break 'dono;
+                            }
                             println!("Got new donation amount {}", d.amount);
                             let dollars = format_dollars(d.all_donors_event_total);
                             match write_file(&dollars, TOTAL_DONATION_FILENAME) {
