@@ -5,6 +5,8 @@ use tokio_tungstenite::{
 };
 use tokio_util::sync::CancellationToken;
 
+use crate::donation::DonationMessage;
+
 pub async fn connect_socket(
     url: &str,
     cookie: &str,
@@ -61,6 +63,15 @@ pub async fn run_connection(
                     Some(Ok(Message::Text(text))) => {
                         println!("\n[{name}] MESSAGE:");
                         println!("{text}");
+                        let donation = serde_json::from_str::<DonationMessage>(&text);
+                        match donation {
+                          Ok(d) => {
+                            println!("Got new donation amount {}", d.amount);
+                          },
+                          Err(_) => {
+                            println!("Failed to parse donation message");
+                          }
+                        }
                     }
 
                     Some(Ok(Message::Binary(data))) => {

@@ -1,16 +1,45 @@
 mod auth;
 mod config;
+mod donation;
+mod event;
 mod listener;
 mod websocket;
+mod write_file;
 
 use tokio_util::sync::CancellationToken;
 
+use crate::{
+    config::{EVENT_ID, TOTAL_DONATION_FILENAME},
+    write_file::write_file,
+};
 use auth::{load_cookie, login, validate_cookie};
 use config::SOCKETS;
 use listener::listen;
 
+use crate::event::fetch_event;
+
 #[tokio::main]
 async fn main() {
+    println!("Initializing donation total");
+    let event = fetch_event(EVENT_ID).await;
+    match event {
+        Ok(e) => {
+            match write_file(
+                &format!("${:.2}", e.donation_total),
+                TOTAL_DONATION_FILENAME,
+            ) {
+                Ok(_) => println!(
+                    "Initialized {TOTAL_DONATION_FILENAME} to ${:.2}",
+                    e.donation_total
+                ),
+                Err(_) => println!("Failed to write to file!"),
+            }
+        }
+        Err(_) => {
+            println!("Failed to fetch initial donation total!");
+        }
+    }
+
     let session_cookie = match load_cookie() {
         Some(cookie) => {
             println!("Found saved session cookie.");
