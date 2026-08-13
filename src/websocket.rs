@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::sync::Mutex;
+
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::{
     connect_async,
@@ -5,6 +8,7 @@ use tokio_tungstenite::{
 };
 use tokio_util::sync::CancellationToken;
 
+use crate::donation::Donation;
 use crate::{
     TOTAL_DONATION_FILENAME, bid::write_bid, config::EVENT_ID, dollars::format_dollars,
     donation::DonationMessage, write_file::write_file,
@@ -56,6 +60,7 @@ pub async fn run_connection(
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >,
     shutdown: CancellationToken,
+    donations: &Arc<Mutex<Vec<Donation>>>,
 ) -> ConnectionResult {
     let (mut write, mut read) = ws_stream.split();
 
@@ -73,7 +78,7 @@ pub async fn run_connection(
                                 break 'dono;
                             }
                             println!("Got new donation amount {}", d.amount);
-                            let dollars = format_dollars(d.all_donors_event_total);
+                            let dollars = format_dollars(d.all_donors_event_total, false);
                             match write_file(&dollars, TOTAL_DONATION_FILENAME) {
                                 Ok(_) => println!("Updated {TOTAL_DONATION_FILENAME} to {dollars}"),
                                 Err(_) => println!("Failed to write to file!"),
@@ -84,6 +89,8 @@ pub async fn run_connection(
                                 }
                             }
                             println!("Finished writing bids to file!");
+                            let mut donos = donations.lock().unwrap();
+                            donos.
                           },
                           Err(_) => {
                             println!("Failed to parse donation message!");

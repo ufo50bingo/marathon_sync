@@ -1,13 +1,25 @@
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
-use crate::websocket::{ConnectionResult, connect_socket, run_connection};
+use crate::{
+    donation::Donation,
+    websocket::{ConnectionResult, connect_socket, run_connection},
+};
 
 const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(30);
 
-pub async fn listen(name: &str, url: &str, cookie: &str, shutdown: CancellationToken) {
+pub async fn listen(
+    name: &str,
+    url: &str,
+    cookie: &str,
+    shutdown: CancellationToken,
+    donations: &Arc<Mutex<Vec<Donation>>>,
+) {
     let mut reconnect_delay = Duration::from_secs(1);
 
     loop {
@@ -24,7 +36,8 @@ pub async fn listen(name: &str, url: &str, cookie: &str, shutdown: CancellationT
 
                 reconnect_delay = Duration::from_secs(1);
 
-                let connection_result = run_connection(name, ws_stream, shutdown.clone()).await;
+                let connection_result =
+                    run_connection(name, ws_stream, shutdown.clone(), donations).await;
 
                 match connection_result {
                     ConnectionResult::Shutdown => {

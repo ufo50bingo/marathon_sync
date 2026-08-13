@@ -8,12 +8,16 @@ mod listener;
 mod websocket;
 mod write_file;
 
+use std::sync::Arc;
+use std::sync::Mutex;
+
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     bid::{fetch_bids, write_bid},
     config::{EVENT_ID, TOTAL_DONATION_FILENAME},
     dollars::format_dollars,
+    donation::{fetch_donations, write_donations},
     write_file::write_file,
 };
 use auth::{load_cookie, login, validate_cookie};
@@ -28,7 +32,7 @@ async fn main() {
     let event = fetch_event(EVENT_ID).await;
     match event {
         Ok(e) => {
-            let dollars = format_dollars(e.donation_total);
+            let dollars = format_dollars(e.donation_total, false);
             match write_file(&dollars, TOTAL_DONATION_FILENAME) {
                 Ok(_) => println!("Initialized {TOTAL_DONATION_FILENAME} to {dollars}"),
                 Err(_) => println!("Failed to write to file!"),
@@ -54,6 +58,22 @@ async fn main() {
             println!("Failed to fetch initial bids!");
         }
     }
+
+    println!("Initializing donations");
+    let donations = fetch_donations(EVENT_ID).await;
+    match &donations {
+        Ok(proper_donations) => {
+            let _ = write_donations(proper_donations);
+            println!("Finished writing donations to file!");
+        }
+        Err(_) => {
+            println!("Failed to fetch initial donations!");
+        }
+    }
+    let wrapped_donatons = match donations {
+        Ok(donations) => Arc::new(Mutex::new(donations)),
+        Err(_) => Arc::new(Mutex::new(vec![])),
+    };
 
     let session_cookie = match load_cookie() {
         Some(cookie) => {
@@ -96,7 +116,7 @@ async fn main() {
         let cookie = session_cookie.clone();
 
         tasks.push(tokio::spawn(async move {
-            listen(name, url, &cookie, shutdown).await;
+            listen(name, url, &cookie, shutdown, &wrapped_donatons).await;
         }));
     }
 
