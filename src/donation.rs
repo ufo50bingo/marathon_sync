@@ -15,8 +15,7 @@ pub struct DonationMessage {
     pub amount: f64,
     // pub timereceived: String,
     pub bids: Vec<Bid>,
-    #[allow(non_snake_case)]
-    donor__visiblename: String,
+    donor_name: String,
 }
 
 #[derive(Deserialize)]
@@ -32,7 +31,7 @@ pub struct Donation {
 
 pub fn get_donation_from_message(donation: DonationMessage) -> Donation {
     Donation {
-        donor_name: donation.donor__visiblename,
+        donor_name: donation.donor_name,
         amount: donation.amount,
     }
 }

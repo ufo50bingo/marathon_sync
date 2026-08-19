@@ -8,5 +8,4 @@ pub const SOCKETS: &[(&str, &str)] = &[(
 
 pub const TEXT_SOURCES_DIR: &str = "text_sources";
 pub const TOTAL_DONATION_FILENAME: &str = "total_donations.txt";
-pub const EVENT_ID: u64 = 2;
 pub const MAX_DONATIONS: u64 = 20;

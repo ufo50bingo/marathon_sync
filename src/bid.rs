@@ -1,5 +1,6 @@
 use std::io;
 
+use reqwest::header::HeaderValue;
 use serde::Deserialize;
 
 use crate::{dollars::format_dollars, write_file::write_file};
@@ -14,7 +15,6 @@ pub struct Bid {
     pub full_name: String,
     // goal: Option<f64>,
     total: f64,
-    pub istarget: bool,
 }
 
 #[derive(Deserialize)]
@@ -23,17 +23,28 @@ struct BidsResponse {
     results: Vec<Bid>,
 }
 
-pub async fn fetch_bids(event_id: u64) -> Result<Vec<Bid>, reqwest::Error> {
-    let mut url =
-        format!("https://donate.cherry-rush.org/tracker/api/v2/events/{event_id}/bids/?limit=500");
+pub async fn fetch_bids(
+    event_id: u64,
+    session_cookie: &HeaderValue,
+) -> Result<Vec<Bid>, reqwest::Error> {
+    let mut url = format!(
+        "https://donate.cherry-rush.org/tracker/api/v2/events/{event_id}/bids/feed_all?limit=500"
+    );
 
     let mut bids = Vec::new();
 
     loop {
-        let response = reqwest::get(&url).await?.json::<BidsResponse>().await?;
-        bids.extend(response.results.into_iter().filter(|b| b.istarget));
+        let response = reqwest::Client::new()
+            .get(&url)
+            .header(reqwest::header::COOKIE, session_cookie)
+            // .header("Origin", "https://donate.cherry-rush.org")
+            .send()
+            .await?;
 
-        match response.next {
+        let json = response.json::<BidsResponse>().await?;
+        bids.extend(json.results);
+
+        match json.next {
             Some(next) => url = next,
             None => break,
         }

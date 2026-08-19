@@ -3,6 +3,7 @@ use std::{
     time::Duration,
 };
 
+use reqwest::header::HeaderValue;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
@@ -16,13 +17,15 @@ const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(30);
 pub async fn listen(
     name: &str,
     url: &str,
-    cookie: &str,
+    cookie: &HeaderValue,
     shutdown: CancellationToken,
-    donations: &Arc<Mutex<Vec<Donation>>>,
+    donations: Arc<Mutex<Vec<Donation>>>,
+    event_id: u64,
 ) {
     let mut reconnect_delay = Duration::from_secs(1);
 
     loop {
+        let dono_clone = Arc::clone(&donations);
         if shutdown.is_cancelled() {
             println!("[{name}] Shutdown requested.");
             break;
@@ -37,7 +40,7 @@ pub async fn listen(
                 reconnect_delay = Duration::from_secs(1);
 
                 let connection_result =
-                    run_connection(name, ws_stream, shutdown.clone(), donations).await;
+                    run_connection(name, ws_stream, shutdown.clone(), dono_clone, event_id).await;
 
                 match connection_result {
                     ConnectionResult::Shutdown => {

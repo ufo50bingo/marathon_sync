@@ -2,21 +2,22 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use futures_util::{SinkExt, StreamExt};
-use tokio_tungstenite::{
-    connect_async,
-    tungstenite::{Message, client::IntoClientRequest},
-};
+use reqwest::header::HeaderValue;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tokio_util::sync::CancellationToken;
 
+use crate::auth::get_request_with_auth;
 use crate::donation::Donation;
+use crate::donation::get_donation_from_message;
+use crate::donation::write_donations;
 use crate::{
-    TOTAL_DONATION_FILENAME, bid::write_bid, config::EVENT_ID, dollars::format_dollars,
-    donation::DonationMessage, write_file::write_file,
+    TOTAL_DONATION_FILENAME, bid::write_bid, dollars::format_dollars, donation::DonationMessage,
+    write_file::write_file,
 };
 
 pub async fn connect_socket(
     url: &str,
-    cookie: &str,
+    cookie: &HeaderValue,
 ) -> Result<
     (
         tokio_tungstenite::WebSocketStream<
@@ -26,27 +27,7 @@ pub async fn connect_socket(
     ),
     tokio_tungstenite::tungstenite::Error,
 > {
-    let mut request = url
-        .into_client_request()
-        .map_err(tokio_tungstenite::tungstenite::Error::from)?;
-
-    request.headers_mut().insert(
-        "Cookie",
-        cookie.parse().map_err(|_| {
-            tokio_tungstenite::tungstenite::Error::Http(
-                tokio_tungstenite::tungstenite::http::Response::builder()
-                    .status(400)
-                    .body(Some("Invalid cookie".as_bytes().to_vec()))
-                    .unwrap(),
-            )
-        })?,
-    );
-
-    request
-        .headers_mut()
-        .insert("Origin", "https://donate.cherry-rush.org".parse().unwrap());
-
-    connect_async(request).await
+    connect_async(get_request_with_auth(url, cookie)?).await
 }
 
 pub enum ConnectionResult {
@@ -60,7 +41,8 @@ pub async fn run_connection(
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >,
     shutdown: CancellationToken,
-    donations: &Arc<Mutex<Vec<Donation>>>,
+    donations: Arc<Mutex<Vec<Donation>>>,
+    event_id: u64,
 ) -> ConnectionResult {
     let (mut write, mut read) = ws_stream.split();
 
@@ -74,7 +56,7 @@ pub async fn run_connection(
                         let donation = serde_json::from_str::<DonationMessage>(&text);
                         match donation {
                           Ok(d) => 'dono: {
-                            if d.event != EVENT_ID {
+                            if d.event != event_id {
                                 break 'dono;
                             }
                             println!("Got new donation amount {}", d.amount);
@@ -83,14 +65,23 @@ pub async fn run_connection(
                                 Ok(_) => println!("Updated {TOTAL_DONATION_FILENAME} to {dollars}"),
                                 Err(_) => println!("Failed to write to file!"),
                             };
-                            for bid in d.bids.iter().filter(|b| b.istarget) {
+                            for bid in &d.bids {
                                 if let Err(_) = write_bid(bid) {
                                     println!("Failed to write bid {} to file!", &bid.full_name);
                                 }
                             }
                             println!("Finished writing bids to file!");
-                            let mut donos = donations.lock().unwrap();
-                            donos.
+                            let plain_donation = get_donation_from_message(d);
+                            let mut mutable_donations = donations.lock().unwrap();
+                            mutable_donations.insert(0, plain_donation);
+                            if mutable_donations.len() > 20 {
+                                mutable_donations.pop();
+                            }
+                            if let Ok(_) = write_donations(&mutable_donations) {
+                                println!("Finished updating donation names/amounts!");
+                            } else {
+                                println!("Failed to update donation names/amounts!");
+                            }
                           },
                           Err(_) => {
                             println!("Failed to parse donation message!");

@@ -1,10 +1,14 @@
-use reqwest::cookie::{CookieStore, Jar};
+use reqwest::{
+    cookie::{CookieStore, Jar},
+    header::HeaderValue,
+};
 use scraper::{Html, Selector};
 use std::{
     fs,
     io::{self, Write},
     sync::Arc,
 };
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use url::Url;
 
 use crate::{
@@ -12,13 +16,19 @@ use crate::{
     websocket::connect_socket,
 };
 
-pub fn load_cookie() -> Option<String> {
+pub fn load_cookie() -> Option<HeaderValue> {
     let contents = fs::read_to_string(COOKIE_FILE).ok()?;
 
     let cookie = contents.trim();
 
-    if cookie.starts_with("sessionid=") && cookie.len() > "sessionid=".len() {
-        Some(cookie.to_string())
+    if cookie.starts_with("sessionid=") {
+        match cookie.parse::<HeaderValue>() {
+            Ok(result) => Some(result),
+            Err(_) => {
+                eprintln!("Ignoring malformed {COOKIE_FILE}");
+                None
+            }
+        }
     } else {
         eprintln!("Ignoring malformed {COOKIE_FILE}");
         None
@@ -40,7 +50,7 @@ fn save_cookie(cookie: &str) -> io::Result<()> {
     Ok(())
 }
 
-pub async fn validate_cookie(cookie: &str) -> bool {
+pub async fn validate_cookie(cookie: &HeaderValue) -> bool {
     let (_, url) = SOCKETS[0];
 
     println!("Checking saved session against {url}...");
@@ -61,7 +71,7 @@ pub async fn validate_cookie(cookie: &str) -> bool {
     }
 }
 
-pub async fn login() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn login() -> Result<HeaderValue, Box<dyn std::error::Error + Send + Sync>> {
     println!();
     println!("Django admin login");
     println!("------------------");
@@ -140,12 +150,16 @@ pub async fn login() -> Result<String, Box<dyn std::error::Error + Send + Sync>>
         .ok_or("Django login succeeded, but no sessionid cookie was found")?
         .to_string();
 
+    let header_value = session_cookie
+        .parse::<HeaderValue>()
+        .map_err(|_| "Failed to parse cookie to HeaderValue")?;
+
     save_cookie(&session_cookie)?;
 
     println!("Login successful.");
     println!("Session saved to {COOKIE_FILE}.");
 
-    Ok(session_cookie)
+    Ok(header_value)
 }
 
 fn extract_csrf_token(html: &str) -> Option<String> {
@@ -158,4 +172,22 @@ fn extract_csrf_token(html: &str) -> Option<String> {
         .next()
         .and_then(|element| element.value().attr("value"))
         .map(str::to_string)
+}
+
+pub fn get_request_with_auth(
+    url: &str,
+    cookie: &HeaderValue,
+) -> Result<tokio_tungstenite::tungstenite::http::Request<()>, tokio_tungstenite::tungstenite::Error>
+{
+    let mut request = url
+        .into_client_request()
+        .map_err(tokio_tungstenite::tungstenite::Error::from)?;
+
+    request.headers_mut().insert("Cookie", cookie.clone());
+
+    request
+        .headers_mut()
+        .insert("Origin", "https://donate.cherry-rush.org".parse().unwrap());
+
+    Ok(request)
 }
